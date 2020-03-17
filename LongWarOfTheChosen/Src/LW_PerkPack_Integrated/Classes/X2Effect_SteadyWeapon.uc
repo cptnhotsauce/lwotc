@@ -1,8 +1,13 @@
-class X2Effect_SteadyWeapon extends X2Effect_Persistent;
+class X2Effect_SteadyWeapon extends X2Effect_Persistent config(GameData_SoldierSkills);
 
 var int Aim_Bonus;
 var int Crit_Bonus;
 
+var config array<name> WEAPON_CATEGORIES_LOW_BONUS;
+var config array<name> WEAPON_CATEGORIES_HIGH_BONUS;
+
+var config float LOW_BONUS_MODIFIER;
+var config float HIGH_BONUS_MODIFIER;
 function RegisterForEvents(XComGameState_Effect EffectGameState)
 {
 	local X2EventManager EventMgr;
@@ -15,7 +20,7 @@ function RegisterForEvents(XComGameState_Effect EffectGameState)
 	UnitState = XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(EffectGameState.ApplyEffectParameters.SourceStateObjectRef.ObjectID));
 
 	EventMgr.RegisterForEvent(EffectObj, 'AbilityActivated', SteadyWeaponActionListener, ELD_OnStateSubmitted, 50, UnitState,, EffectObj);
-	EventMgr.RegisterForEvent(EffectObj, 'UnitTakeEffectDamage', SteadyWeaponWoundListener, ELD_OnStateSubmitted, 51, UnitState,, EffectObj);
+	//EventMgr.RegisterForEvent(EffectObj, 'UnitTakeEffectDamage', SteadyWeaponWoundListener, ELD_OnStateSubmitted, 51, UnitState,, EffectObj);
 	EventMgr.RegisterForEvent(EffectObj, 'ImpairingEffect', SteadyWeaponWoundListener, ELD_OnStateSubmitted, 52, UnitState,, EffectObj);
 }
 
@@ -105,18 +110,49 @@ static function EventListenerReturn SteadyWeaponWoundListener(Object EventData, 
 function GetToHitModifiers(XComGameState_Effect EffectState, XComGameState_Unit Attacker, XComGameState_Unit Target, XComGameState_Ability AbilityState, class<X2AbilityToHitCalc> ToHitType, bool bMelee, bool bFlanking, bool bIndirectFire, out array<ShotModifierInfo> ShotModifiers)
 {
 	local ShotModifierInfo ShotInfo;
+	local XComGameState_Item SourceWeaponState;
+
+	SourceWeaponState = AbilityState.GetSourceWeapon();
 
 	if(!bMelee && AbilityState.SourceWeapon == EffectState.ApplyEffectParameters.ItemStateObjectRef)
 	{
-		ShotInfo.ModType = eHit_Success;
-		ShotInfo.Reason = FriendlyName;
-		ShotInfo.Value = Aim_Bonus;
-		ShotModifiers.AddItem(ShotInfo);
+		if(default.WEAPON_CATEGORIES_HIGH_BONUS.Find(SourceWeaponState.GetWeaponCategory()) != INDEX_NONE)
+		{
+			ShotInfo.ModType = eHit_Success;
+			ShotInfo.Reason = FriendlyName;
+			ShotInfo.Value = Aim_Bonus * default.HIGH_BONUS_MODIFIER;
+			ShotModifiers.AddItem(ShotInfo);
+		
+			ShotInfo.ModType = eHit_Crit;
+			ShotInfo.Reason = FriendlyName;
+			ShotInfo.Value = Crit_Bonus* default.HIGH_BONUS_MODIFIER;
+			ShotModifiers.AddItem(ShotInfo);
+		}
+		else if(default.WEAPON_CATEGORIES_LOW_BONUS.Find(SourceWeaponState.GetWeaponCategory()) != INDEX_NONE)
+		{
+			ShotInfo.ModType = eHit_Success;
+			ShotInfo.Reason = FriendlyName;
+			ShotInfo.Value = Aim_Bonus * default.LOW_BONUS_MODIFIER;
+			ShotModifiers.AddItem(ShotInfo);
+	
+			ShotInfo.ModType = eHit_Crit;
+			ShotInfo.Reason = FriendlyName;
+			ShotInfo.Value = Crit_Bonus * default.LOW_BONUS_MODIFIER;
+			ShotModifiers.AddItem(ShotInfo);
+		}
+		else
+		{
+			ShotInfo.ModType = eHit_Success;
+			ShotInfo.Reason = FriendlyName;
+			ShotInfo.Value = Aim_Bonus;
+			ShotModifiers.AddItem(ShotInfo);
+	
+			ShotInfo.ModType = eHit_Crit;
+			ShotInfo.Reason = FriendlyName;
+			ShotInfo.Value = Crit_Bonus;
+			ShotModifiers.AddItem(ShotInfo);
+		}
 
-		ShotInfo.ModType = eHit_Crit;
-		ShotInfo.Reason = FriendlyName;
-		ShotInfo.Value = Crit_Bonus;
-		ShotModifiers.AddItem(ShotInfo);
 	}
 
 }
